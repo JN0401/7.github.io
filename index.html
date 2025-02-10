@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>随机选人</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #1a1a2e 0%, #2a2356 100%);
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+            color: #ecf0f1;
+            position: relative;
+        }
+
+        .container {
+            position: relative;
+            padding: 50px;
+            border-radius: 25px;
+            background: rgba(40, 40, 70, 0.5);
+            box-shadow: 0 0 100px rgba(106, 90, 205, 0.3);
+            text-align: center;
+            width: 500px;
+        }
+
+        h1 {
+            font-size: 3em;
+            color: #8a8ac4;
+            text-shadow: 0 0 20px rgba(138, 43, 226, 0.5);
+            margin-bottom: 50px;
+        }
+
+        #display {
+            font-size: 4em;
+            color: #d8bfd8;
+            text-align: center;
+            margin: 50px 0;
+            min-height: 1.5em;
+            text-shadow: 0 0 30px #9370db;
+        }
+
+        #display-selecting {
+            animation: text-glow 2s ease-in-out infinite alternate;
+        }
+
+        #display-selected {
+            color: #ffd700;
+            animation: none;
+        }
+
+        .score {
+            font-size: 2em;
+            margin-top: 30px;
+            display: none; /* 默认隐藏加分按钮 */
+        }
+
+        .score-button {
+            padding: 15px 30px;
+            font-size: 1.5em;
+            background: linear-gradient(45deg, #6a5acd, #9370db);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 0 10px;
+        }
+
+        .score-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 40px rgba(147, 112, 219, 0.5);
+        }
+
+        #select-button {
+            padding: 20px 50px;
+            font-size: 3em;
+            background: linear-gradient(45deg, #6a5acd, #9370db);
+            border: none;
+            border-radius: 25px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-top: 30px;
+        }
+
+        #select-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 40px rgba(147, 112, 219, 0.5);
+        }
+
+        #submit-button {
+            padding: 15px 40px;
+            font-size: 1.5em;
+            background: linear-gradient(45deg, #6a5acd, #9370db);
+            border: none;
+            border-radius: 25px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-top: 30px;
+        }
+
+        #submit-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 40px rgba(147, 112, 219, 0.5);
+        }
+
+        .result {
+            font-size: 2.5em;
+            color: #d8bfd8;
+            margin-top: 30px;
+            display: none; /* 默认隐藏结果栏 */
+        }
+
+        @keyframes breathe {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.7; transform: scale(1.05); }
+        }
+
+        @keyframes text-glow {
+            from { text-shadow: 0 0 20px #9370db; }
+            to { text-shadow: 0 0 50px #6a5acd; }
+        }
+
+        /* 添加Canvas样式 */
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div class="container">
+        <div class="breathing-light"></div>
+        <h1>随机选人系统</h1>
+        <div id="display" class="display-selecting">🎮 Ready</div>
+        <button id="select-button" onclick="selectRandom()">开始随机</button>
+        <div id="score-section" class="score">
+            <button class="score-button" onclick="updateScore(1)">+</button>
+            <span id="score">0</span>
+            <button class="score-button" onclick="updateScore(-1)">-</button>
+            <button id="submit-button" onclick="submitScore()">提交</button>
+        </div>
+        <div id="result" class="result"></div>
+    </div>
+
+    <audio id="audio" src="音效.mp3" preload="auto"></audio>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const names = [
+            "郭俊海", "李嘉妮", "方敏娴", "钟羽彤", "麦玉珍",
+            "李晓渔", "梁馨允", "黄秀苏", "陈禾思蕾", "邱霞",
+            "郭涛", "吴咏夏", "黄心蕾", "黄丽颖", "赵欣雨",
+            "秦晓芸", "农素侦", "张思静", "顾容华", "陈兆宇",
+            "张婷婷", "陆梅莲", "廖姗姗", "陆金王", "陈梅清",
+            "谢晶晶", "丁丽菲", "叶楠", "何坤", "陈真珍",
+            "覃梦圆", "胡芳", "黄静兰", "黄晓敏", "黄雪玫"
+        ];
+
+        // 为每个名字分配一个颜色
+        const nameColors = {
+            "郭俊海": "#ff69b4",
+            "李嘉妮": "#32cd32",
+            "方敏娴": "#9400d3",
+            "钟羽彤": "#ffff00",
+            "麦玉珍": "#8a2be2",
+            "李晓渔": "#00ffff",
+            "梁馨允": "#ffa500",
+            "黄秀苏": "#ff4500",
+            "陈禾思蕾": "#20b2aa",
+            "邱霞": "#ff6347",
+            "郭涛": "#1e90ff",
+            "吴咏夏": "#ff00ff",
+            "黄心蕾": "#98fb98",
+            "黄丽颖": "#00ff7f",
+            "赵欣雨": "#add8e6",
+            "秦晓芸": "#dda0dd",
+            "农素侦": "#228b22",
+            "张思静": "#ff0000",
+            "顾容华": "#0000ff",
+            "陈兆宇": "#008000",
+            "张婷婷": "#ffa07a",
+            "陆梅莲": "#ff69b4",
+            "廖姗姗": "#32cd32",
+            "陆金王": "#9400d3",
+            "陈梅清": "#ffff00",
+            "谢晶晶": "#8a2be2",
+            "丁丽菲": "#00ffff",
+            "叶楠": "#ffa500",
+            "何坤": "#ff4500",
+            "陈真珍": "#20b2aa",
+            "覃梦圆": "#ff6347",
+            "胡芳": "#1e90ff",
+            "黄静兰": "#ff00ff",
+            "黄晓敏": "#98fb98",
+            "黄雪玫": "#00ff7f"
+        };
+
+        let selectedName = null;
+        let score = 0;
+        let particlesL = [];
+        let particlesR = [];
+        const audio = document.getElementById('audio');
+
+        function selectRandom() {
+            const display = document.getElementById('display');
+            display.classList.add('display-selecting');
+            display.classList.remove('display-selected');
+            display.style.color = '#ecf0f1';
+            display.textContent = "🎮 Ready";
+
+            document.getElementById('score-section').style.display = 'none';
+            document.getElementById('result').style.display = 'none';
+
+            let count = 0;
+            const totalIterations = 15;
+
+            const interval = setInterval(() => {
+                selectedName = names[Math.floor(Math.random() * names.length)];
+                display.textContent = selectedName;
+                count++;
+
+                // 每次更新名字时播放音效和启动烟花特效
+                audio.play();
+                startFireworks();
+
+                if (count >= totalIterations) {
+                    clearInterval(interval);
+                    display.classList.remove('display-selecting');
+                    display.classList.add('display-selected');
+                    display.style.color = '#ffd700';
+                    display.style.animation = 'text-glow 2s ease-in-out infinite alternate';
+                    setTimeout(() => {
+                        display.style.color = '#ecf0f1';
+                        display.style.animation = 'none';
+                    }, 1000);
+
+                    // 显示加分按钮并重置分数
+                    document.getElementById('score-section').style.display = 'block';
+                    score = 0;
+                    document.getElementById('score').textContent = score.toString();
+
+                    // 启动烟花特效
+                    startFireworks();
+                }
+            }, 100);
+        }
+
+        function updateScore(change) {
+            if (selectedName) {
+                score += change;
+                document.getElementById('score').textContent = score.toString();
+            } else {
+                alert('请先随机选择一个名字');
+            }
+        }
+
+        function submitScore() {
+            if (selectedName) {
+                const result = `${selectedName} 的分数是: ${score}`;
+                document.getElementById('result').textContent = result;
+                document.getElementById('result').style.display = 'block';
+
+                // 隐藏加分按钮
+                document.getElementById('score-section').style.display = 'none';
+            } else {
+                alert('请先随机选择一个名字');
+            }
+        }
+
+        // 烟花粒子对象
+        function Particle(x, y, color, size, lifespan, speed) {
+            this.x = x;
+            this.y = y;
+            this.color = color;
+            this.size = size;
+            this.lifespan = lifespan;
+            this.speed = speed;
+        }
+
+        Particle.prototype.update = function () {
+            this.lifespan--;
+            this.size *= 0.98;
+            this.y -= this.speed;
+
+            if (this.lifespan <= 0) {
+                return false;
+            }
+            return true;
+        };
+
+        Particle.prototype.draw = function () {
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fill();
+        };
+
+        function createFirework(left) {
+            let color = nameColors[selectedName] || '#ffffff'; // 默认白色
+            let size = 5 + Math.random() * 10;
+            let lifespan = 100 + Math.random() * 50;
+            let speed = 2 + Math.random() * 5;
+
+            if (left) {
+                particlesL.push(new Particle(Math.random() * canvas.width / 2, canvas.height * 0.9, color, size, lifespan, speed));
+            } else {
+                particlesR.push(new Particle(canvas.width / 2 + Math.random() * canvas.width / 2, canvas.height * 0.9, color, size, lifespan, speed));
+            }
+        }
+
+        // 启动烟花
+        function startFireworks() {
+            for (let i = 0; i < 200; i++) {
+                setTimeout(createFirework, i * 10, true);
+                setTimeout(createFirework, i * 10, false);
+            }
+            animate();
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            particlesL = particlesL.filter(particle => particle.update());
+            particlesL.forEach(particle => particle.draw());
+
+            particlesR = particlesR.filter(particle => particle.update());
+            particlesR.forEach(particle => particle.draw());
+
+            if (particlesL.length > 0 || particlesR.length > 0) {
+                requestAnimationFrame(animate);
+            }
+        }
+    </script>
+</body>
+</html>
